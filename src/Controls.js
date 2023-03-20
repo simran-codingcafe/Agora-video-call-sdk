@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { useClient } from "./settings";
+import { useClient } from "./settings.js";
 import { Grid } from "@material-ui/core";
 import MicNoneOutlinedIcon from "@material-ui/icons/MicNoneOutlined";
 import MicOffOutlinedIcon from "@material-ui/icons/MicOffOutlined";
@@ -8,10 +8,12 @@ import VideocamOffIconOutlined from "@material-ui/icons/VideocamOffOutlined";
 import PhoneDisabledIcon from '@mui/icons-material/PhoneDisabled';
 import ChatIcon from '@mui/icons-material/ChatBubbleOutlineOutlined';
 import AutoAwesomeMosaicIcon from '@mui/icons-material/AutoAwesomeMosaicOutlined';
+import axios from "axios"
+
 
 export default function Controls(props) {
   const client = useClient();
-  const { tracks, setStart, setInCall, openChat, setOpenChat, isPinned, setPinned } = props;
+  const { setStart, setInCall, tracks, openChat, setOpenChat, isPinned, setPinned } = props;
   const [trackState, setTrackState] = useState({ video: true, audio: true });
 
   useEffect(() => {
@@ -19,11 +21,16 @@ export default function Controls(props) {
     const params = new URLSearchParams(url.search);
     const calltype = params.get('join-with');
 
-    if (calltype === "audio") {
-      setTimeout(() => {
-        mute("video")
-      }, 500);
-    }
+    setTimeout(() => {
+      if (calltype === "audio") {
+        setTimeout(() => {
+          tracks[1].setEnabled(!trackState.video);
+          setTrackState((ps) => {
+            return { ...ps, video: !ps.video };
+          });
+        }, 1000);
+      }
+    }, 1000);
   }, [])
 
   const mute = async (type) => {
@@ -47,24 +54,41 @@ export default function Controls(props) {
     tracks[1].close();
     setStart(false);
     setInCall(false);
-    window.location.href = localStorage.getItem("leaveURL")
+    axios
+      .get(
+        `https://lingwa.app/wp-json/api/leave-call?thread_id=${localStorage.getItem("thread_id")}&user_id=${localStorage.getItem("user_id")}`,
+        {
+          headers: {
+            "content-type": "application/json",
+          },
+        }
+      )
+      .then((res) => {
+        if (res.data.success) {
+          console.log(res.data)
+          window.location.href = localStorage.getItem("leaveURL")
+        }
+      })
+      .catch((error) => {
+        console.error(error);
+      });
   };
 
   return (
-    <Grid container spacing={2} alignItems="center" className="btnContainer">
-      <button className="localbtns" onClick={() => mute("video")}>
+    <Grid container spacing={2} alignItems="center" className="vc-btnContainer">
+      <button className="vc-localbtns" onClick={() => mute("video")}>
         {trackState.video ? <VideocamIconOutlined /> : <VideocamOffIconOutlined />}
       </button>
-      <button className="localbtns" onClick={() => mute("audio")}>
+      <button className="vc-localbtns" onClick={() => mute("audio")}>
         {trackState.audio ? <MicNoneOutlinedIcon /> : <MicOffOutlinedIcon />}
       </button>
-      <button className="localbtns" style={{ color: "red", transform: "scaleX(-1)" }} onClick={() => leaveChannel()}>
+      <button className="vc-localbtns" style={{ color: "red", transform: "scaleX(-1)" }} onClick={() => leaveChannel()}>
         <PhoneDisabledIcon />
       </button>
-      <button className="localbtns" style={{ color: openChat ? "blue" : "" }} onClick={() => setOpenChat(!openChat)}>
+      <button className="vc-localbtns" style={{ color: openChat ? "blue" : "" }} onClick={() => setOpenChat(!openChat)}>
         <ChatIcon />
       </button>
-      <button className="localbtns" onClick={() => setPinned(!isPinned)}>
+      <button className="vc-localbtns" onClick={() => setPinned(!isPinned)}>
         <AutoAwesomeMosaicIcon />
       </button>
     </Grid>

@@ -14,14 +14,15 @@ const ChatBox = (props) => {
     const scrollToBottom = useScrollToBottom();
     const [sticky] = useSticky();
 
-    const fetchChat = () => {
+    const fetchChat = (token) => {
         axios
             .get(
-                `https://wordpress-932189-3236313.cloudwaysapps.com/wp-json/api/get-messages?thread_id=${localStorage.getItem("thread_id")}&user_id=${localStorage.getItem("user_id")}`,
+                `https://lingwa.app/wp-json/api/get-messages?thread_id=${localStorage.getItem("thread_id")}&user_id=${localStorage.getItem("user_id")}`,
                 {
                     headers: {
                         "content-type": "application/json",
                     },
+                    cancelToken: token
                 }
             )
             .then((res) => {
@@ -50,7 +51,7 @@ const ChatBox = (props) => {
             formData.append("message", e.target.message.value);
             axios
                 .post(
-                    `https://wordpress-932189-3236313.cloudwaysapps.com/wp-json/api/send-message`,
+                    `https://lingwa.app/wp-json/api/send-message`,
                     formData,
                     {
                         headers: {
@@ -73,7 +74,12 @@ const ChatBox = (props) => {
     };
 
     useEffect(() => {
-        fetchChat()
+        const source = axios.CancelToken.source();
+    fetchChat(source.token);
+
+    return () => {
+        source.cancel();
+    }
     }, [])
 
     return (
