@@ -5,6 +5,8 @@ import ScrollToBottom, {
 } from "react-scroll-to-bottom";
 import SingleChat from "./singleChat";
 import axios from "axios"
+import io from "socket.io-client"
+
 
 const ChatBox = (props) => {
     const [messages, setMessages] = useState([]);
@@ -28,6 +30,7 @@ const ChatBox = (props) => {
             .then((res) => {
                 if (res.data.success) {
                     setMessages(res.data.data);
+                    props.setUnread(false)
                 }
             })
             .catch((error) => {
@@ -75,11 +78,23 @@ const ChatBox = (props) => {
 
     useEffect(() => {
         const source = axios.CancelToken.source();
-    fetchChat(source.token);
+        fetchChat(source.token);
 
-    return () => {
-        source.cancel();
-    }
+        return () => {
+            source.cancel();
+        }
+    }, [])
+
+    useEffect(() => {
+        const source = axios.CancelToken.source();
+        const socket = io("http://phpstack-932189-3368876.cloudwaysapps.com/")
+        socket.on(`${localStorage.getItem("thread_id")}`, (type, data) => {
+            if (type === "message") {
+                props.setUnread(true)
+                fetchChat(source.token);
+            }
+        })
+        return () => socket.disconnect()
     }, [])
 
     return (

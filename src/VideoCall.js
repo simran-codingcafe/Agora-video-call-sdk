@@ -10,6 +10,14 @@ import Video from "./Video";
 import Controls from "./Controls";
 import ChatBox from "./chatbox";
 import axios from "axios"
+import MicNoneOutlinedIcon from "@material-ui/icons/MicNoneOutlined";
+import MicOffOutlinedIcon from "@material-ui/icons/MicOffOutlined";
+import VideocamIconOutlined from "@material-ui/icons/VideocamOutlined";
+import VideocamOffIconOutlined from "@material-ui/icons/VideocamOffOutlined";
+import PhoneDisabledIcon from '@mui/icons-material/PhoneDisabled';
+import ChatIcon from '@mui/icons-material/ChatBubbleOutlineOutlined';
+import AutoAwesomeMosaicIcon from '@mui/icons-material/AutoAwesomeMosaicOutlined';
+import io from "socket.io-client"
 
 
 export default function VideoCall(props) {
@@ -20,12 +28,81 @@ export default function VideoCall(props) {
   const [start, setStart] = useState(false);
   const [isPinned, setPinned] = useState(false)
   const [openChat, setOpenChat] = useState(false)
+  const [unread, setUnread] = useState(false)
   const [username, setUsername] = useState(localStorage.getItem("username"))
   const [callHeading, setCallHeading] = useState(localStorage.getItem("callHeading"))
   const [leaveURL, setLeaveURL] = useState(localStorage.getItem("leaveURL"))
   const client = useClient();
   const { ready, tracks } = useMicrophoneAndCameraTracks();
   const [screenSize, setScreenSize] = useState(window.innerWidth);
+  const [trackState, setTrackState] = useState({ video: true, audio: true });
+
+  // useEffect(() => {
+  //   const url = new URL(window.location.href);
+  //   const params = new URLSearchParams(url.search);
+  //   const calltype = params.get('join-with');
+
+  //   setTimeout(() => {
+  //     if (calltype === "audio") {
+  //       setTimeout(() => {
+  //         tracks[1].setEnabled(!trackState.video);
+  //         setTrackState((ps) => {
+  //           return { ...ps, video: !ps.video };
+  //         });
+  //       }, 1000);
+  //     }
+  //   }, 1000);
+  // }, [])
+
+  const mute = async (type) => {
+    if (type === "audio") {
+      await tracks[0].setEnabled(!trackState.audio);
+      setTrackState((ps) => {
+        return { ...ps, audio: !ps.audio };
+      });
+    } else if (type === "video") {
+      await tracks[1].setEnabled(!trackState.video);
+      setTrackState((ps) => {
+        return { ...ps, video: !ps.video };
+      });
+    }
+  };
+
+  const leaveChannel = async () => {
+    await client.leave();
+    client.removeAllListeners();
+    tracks[0].close();
+    tracks[1].close();
+    setStart(false);
+    setInCall(false);
+    axios
+      .get(
+        `https://lingwa.app/wp-json/api/leave-call?thread_id=${localStorage.getItem("thread_id")}&user_id=${localStorage.getItem("user_id")}`,
+        {
+          headers: {
+            "content-type": "application/json",
+          },
+        }
+      )
+      .then((res) => {
+        if (res.data.success) {
+          window.location.href = localStorage.getItem("leaveURL")
+        }
+      })
+      .catch((error) => {
+        console.error(error);
+      });
+  };
+
+  useEffect(() => { 
+    const socket = io("http://phpstack-932189-3368876.cloudwaysapps.com/")
+    socket.on(`${localStorage.getItem("thread_id")}`,(type, data) => {
+     if (type === "message") {
+         setUnread(true)
+       } 
+    })
+    return () => socket.disconnect()
+}, [])
 
   useEffect(() => {
     window.onresize = function () {
@@ -103,10 +180,20 @@ export default function VideoCall(props) {
       });
 
       try {
-        
         await client.join(config.appId, name, config.token, config.uid);
         if (tracks) await client.publish([tracks[0], tracks[1]]);
         setStart(true);
+        const url = new URL(window.location.href);
+        const params = new URLSearchParams(url.search);
+        const calltype = params.get('join-with');
+        setTimeout(() => {
+          if (calltype === "audio") {
+            tracks[1].setEnabled(!trackState.video);
+            setTrackState((ps) => {
+              return { ...ps, video: !ps.video };
+            });
+          }
+        }, 1000);
         setError(false)
       } catch (error) {
         console.log("error", error);
@@ -146,7 +233,6 @@ export default function VideoCall(props) {
       )
       .then((res) => {
         if (res.data.success) {
-          console.log(res.data)
           window.location.href = leaveURL
         }
       })
@@ -154,13 +240,6 @@ export default function VideoCall(props) {
         console.error(error);
       });
   }
-
-  useEffect(() => {
-    window.addEventListener('beforeunload', endCall);
-    return () => {
-      window.removeEventListener('beforeunload', endCall);
-    };
-  }, []);
 
   return (
     <div className="vc-container">
@@ -189,7 +268,25 @@ export default function VideoCall(props) {
             </Grid>
             <Grid item style={{ height: "10%" }}>
               {ready && tracks && (
-                <Controls tracks={tracks} setStart={setStart} openChat={openChat} setOpenChat={setOpenChat} setInCall={setInCall} isPinned={isPinned} setPinned={setPinned} />
+                // <Controls tracks={tracks} setStart={setStart} openChat={openChat} setOpenChat={setOpenChat} setInCall={setInCall} isPinned={isPinned} setPinned={setPinned} />
+                <Grid container spacing={2} alignItems="center" className="vc-btnContainer">
+                  <button className="vc-localbtns" onClick={() => mute("video")}>
+                    {trackState.video ? <VideocamIconOutlined /> : <VideocamOffIconOutlined />}
+                  </button>
+                  <button className="vc-localbtns" onClick={() => mute("audio")}>
+                    {trackState.audio ? <MicNoneOutlinedIcon /> : <MicOffOutlinedIcon />}
+                  </button>
+                  <button className="vc-localbtns" style={{ color: "red", transform: "scaleX(-1)" }} onClick={() => leaveChannel()}>
+                    <PhoneDisabledIcon />
+                  </button>
+                  <button className="vc-localbtns" style={{ color: openChat ? "blue" : "" }} onClick={() => setOpenChat(!openChat)}>
+                  {unread ? <span className="unread-chat"></span> : ""}
+                    <ChatIcon />
+                  </button>
+                  <button className="vc-localbtns" onClick={() => setPinned(!isPinned)}>
+                    <AutoAwesomeMosaicIcon />
+                  </button>
+                </Grid>
               )}
             </Grid>
           </>
@@ -198,7 +295,7 @@ export default function VideoCall(props) {
       {openChat ?
         <>
           <div className='d-md-flex chatstyle'>
-            <ChatBox username={username} cancelChat={cancelChat} isPinned={isPinned} />
+            <ChatBox username={username} cancelChat={cancelChat} setUnread={setUnread} isPinned={isPinned} />
           </div>
         </>
         : ""}

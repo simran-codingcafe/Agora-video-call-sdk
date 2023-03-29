@@ -65,7 +65,6 @@ export default function Controls(props) {
       )
       .then((res) => {
         if (res.data.success) {
-          console.log(res.data)
           window.location.href = localStorage.getItem("leaveURL")
         }
       })

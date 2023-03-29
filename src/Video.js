@@ -9,7 +9,6 @@ import MenuItem from '@mui/material/MenuItem';
 import axios from "axios"
 
 export default function Video(props) {
-  const { users, isPinned } = props;
   const client = useClient();
   const [gridSpacing, setGridSpacing] = useState(12);
   const [tracks, setTracks] = useState(props.tracks);
@@ -132,15 +131,14 @@ export default function Video(props) {
       setScreenSize(window.innerWidth);
     };
   }, [])
-  console.log(tracks, "all", props.activeSpeaker)
 
   useEffect(() => {
-    setGridSpacing(Math.max(Math.floor(12 / (users?.length + 1)), users?.length < 4 ? 6 : users?.length < 6 ? 4 : 3));
+    setGridSpacing(Math.max(Math.floor(12 / (props.users?.length + 1)), screeSize < 450 ? props.users?.length < 3 ? 12 : 6 : props.users?.length < 4 ? 6 : props.users?.length < 6 ? 4 : 3));
     getUsersDetails()
-  }, [users, tracks]);
+  }, [props.users, tracks]);
   return (
     <>
-      {isPinned ?
+      {props.isPinned ?
         <div className={`${props.activeSpeaker === parseInt(localStorage.getItem("user_id")) ? "activeremoteplayer" : ""}  focusview`}>
           <div className={`${screeSize > 700 && screeSize < 800 ? "focuslocal2" : "focuslocal"}`} style={{ margin: `${props.openChat ? "0" : screeSize > 800 ? "0px 100px 0px 250px" : screeSize > 700 ? "0 70px 0 65px" : "0"}` }}>
             {tracks[1]._enabled === true ?
@@ -158,8 +156,8 @@ export default function Video(props) {
             }
           </div>
           <div className="focusremote" style={{ width: `${screeSize < 767 ? `${screeSize - 32}px` : '350px'}` }}>
-            {users?.length > 0 &&
-              users.map((user) => (
+            {props.users?.length > 0 &&
+              props.users.map((user) => (
                 user.videoTrack !== undefined ?
                   <div className={`${props.activeSpeaker === user.uid ? "activeremoteplayer" : ""} remoteplayer`}>
                     <AgoraVideoPlayer
@@ -199,7 +197,7 @@ export default function Video(props) {
                           // onClick={() => mute("muteAudio", user.uid)}
                           >{user.hasAudio ? "Mute" : "Unmute"}</MenuItem>
                           <MenuItem onClick={() => handleRequest(user.uid, "report")}>Report</MenuItem>
-                          {localStorage.getItem("isAdmin") === true ?
+                          {localStorage.getItem("isAdmin") === "yes" ?
                             <MenuItem onClick={() => handlekick(user.uid)}>Remove from call</MenuItem>
                             : ""}
                         </Menu>
@@ -251,7 +249,7 @@ export default function Video(props) {
                                 // onClick={() => mute("muteAudio", user.uid)}
                                 >{user.hasAudio ? "Mute" : "Unmute"}</MenuItem>
                                 <MenuItem onClick={() => handleRequest(user.uid, "report")}>Report</MenuItem>
-                                {localStorage.getItem("isAdmin") === true ?
+                                {localStorage.getItem("isAdmin") === "yes" ?
                                   <MenuItem onClick={() => handlekick(user.uid)}>Remove from call</MenuItem>
                                   : ""}
                               </Menu>
@@ -262,7 +260,6 @@ export default function Video(props) {
                           </>
                           : ""
                         ))}
-                        <img className={`${props.activeSpeaker === user.uid ? "activeremoteplayer" : ""} img-remote-focus`} src={localStorage.getItem("imageURL")} alt="user image" />
                       </div>
                     </div>
                   </>
@@ -272,7 +269,14 @@ export default function Video(props) {
         :
         <Grid container style={{ height: "100%" }}>
           <Grid item xs={gridSpacing}>
-            {tracks[1]._enabled === true ?
+            {tracks[1]._enabled !== true ?
+              <div className="gridlocal">
+                <div className="local-grid-img">
+                  <img src={localStorage.getItem("imageURL")} alt="user image" className={`${props.activeSpeaker === parseInt(localStorage.getItem("user_id")) ? "activeremoteplayer" : ""} img-grid-local`} />
+                  <span className="vc-username" >{localStorage.getItem("username")}</span>
+                </div>
+              </div>
+              :
               <div className={`${props.activeSpeaker === parseInt(localStorage.getItem("user_id")) ? "activeremoteplayer" : ""} gridlocal`}>
                 <AgoraVideoPlayer
                   videoTrack={tracks[1]}
@@ -281,17 +285,10 @@ export default function Video(props) {
                   <span className="vc-username" >{localStorage.getItem("username")}</span>
                 </AgoraVideoPlayer>
               </div>
-              :
-              <div className="gridlocal">
-                <div className="local-grid-img">
-                  <img src={localStorage.getItem("imageURL")} alt="user image" className={`${props.activeSpeaker === parseInt(localStorage.getItem("user_id")) ? "activeremoteplayer" : ""} img-grid-local`} />
-                  <span className="vc-username" >{localStorage.getItem("username")}</span>
-                </div>
-              </div>
             }
           </Grid>
-          {users?.length > 0 &&
-            users.map((user) => (
+          {props.users?.length > 0 &&
+            props.users.map((user) => (
               user.videoTrack !== undefined ?
                 <Grid item xs={gridSpacing}>
                   <div className={`${props.activeSpeaker === user.uid ? "activeremoteplayer" : ""} remoteplayer2`}>
@@ -332,7 +329,7 @@ export default function Video(props) {
                           // onClick={() => mute("muteAudio", user.uid)}
                           >{user.hasAudio ? "Mute" : "Unmute"}</MenuItem>
                           <MenuItem onClick={() => handleRequest(user.uid, "report")}>Report</MenuItem>
-                          {localStorage.getItem("isAdmin") === true ?
+                          {localStorage.getItem("isAdmin") === "yes" ?
                             <MenuItem onClick={() => handlekick(user.uid)}>Remove from call</MenuItem>
                             : ""}
                         </Menu>
@@ -385,7 +382,7 @@ export default function Video(props) {
                               // onClick={() => mute("muteAudio", user.uid)}
                               >{user.hasAudio ? "Mute" : "Unmute"}</MenuItem>
                               <MenuItem onClick={() => handleRequest(user.uid, "report")}>Report</MenuItem>
-                              {localStorage.getItem("isAdmin") === true ?
+                              {localStorage.getItem("isAdmin") === "yes" ?
                                 <MenuItem onClick={() => handlekick(user.uid)}>Remove from call</MenuItem>
                                 : ""}
                             </Menu>
@@ -397,7 +394,6 @@ export default function Video(props) {
                         :
                         ""
                       ))}
-                      <img className={`${props.activeSpeaker === user.uid ? "activeremoteplayer" : ""} img-remote-grid`} src={localStorage.getItem("imageURL")} alt="user image" />
                     </div>
                   </div>
                 </Grid>

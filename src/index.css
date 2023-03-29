@@ -70,6 +70,7 @@ code {
   z-index: 99;
   cursor: pointer;
   color: black;
+  position: relative
 }
 
 .vc-localbtns:hover,
@@ -211,7 +212,7 @@ code {
 }
 
 .local-focus-img {
-  background-color: #f8f8f8;
+  background-color: #ffffff;
   height: 100%;
   display: flex;
   align-items: center;
@@ -226,7 +227,7 @@ code {
 }
 
 .local-grid-img {
-  background-color: #f8f8f8;
+  background-color: #ffffff;
   height: 100%;
   position: relative;
 }
@@ -243,7 +244,7 @@ code {
 }
 
 .grid-remote-img {
-  background-color: #f8f8f8;
+  background-color: #ffffff;
   height: 100%;
   width: 100%;
   position: relative;
@@ -265,7 +266,7 @@ code {
   height: 100%;
   align-items: center;
   justify-content: center;
-  background-color: #f8f8f8;
+  background-color: #ffffff;
 }
 
 .img-remote-focus {
@@ -273,6 +274,27 @@ code {
   width: 100px;
   border: 1px solid black;
   border-radius: 50%;
+}
+
+.unread-chat2 {
+  position: relative;
+}
+
+.unread-chat {
+  background: #ff0000;
+  border-radius: 100%;
+  position: absolute;
+  top: -5px;
+  left: unset !important;
+  right: -5px !important;
+  height: auto;
+  width: auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 9px;
+  min-width: 17px;
+  min-height: 17px;
 }
 
 .remoteplayer:hover .remotebtnsinfo {
