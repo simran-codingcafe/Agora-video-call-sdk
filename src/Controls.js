@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { useClient } from "./settings.js";
+import { useRTCClient } from "./settings.js";
 import { Grid } from "@material-ui/core";
 import MicNoneOutlinedIcon from "@material-ui/icons/MicNoneOutlined";
 import MicOffOutlinedIcon from "@material-ui/icons/MicOffOutlined";
@@ -12,7 +12,7 @@ import axios from "axios"
 
 
 export default function Controls(props) {
-  const client = useClient();
+  const client = useRTCClient();
   const { setStart, setInCall, tracks, openChat, setOpenChat, isPinned, setPinned } = props;
   const [trackState, setTrackState] = useState({ video: true, audio: true });
 

@@ -87,7 +87,7 @@ const ChatBox = (props) => {
 
     useEffect(() => {
         const source = axios.CancelToken.source();
-        const socket = io("http://phpstack-932189-3368876.cloudwaysapps.com/")
+        const socket = io("https://phpstack-932189-3368876.cloudwaysapps.com/")
         socket.on(`${localStorage.getItem("thread_id")}`, (type, data) => {
             if (type === "message") {
                 props.setUnread(true)

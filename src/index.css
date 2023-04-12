@@ -35,7 +35,7 @@ code {
 }
 
 .chatstyle {
-  width: 350px;
+  width: 480px;
   padding-left: 8px;
 }
 
@@ -138,7 +138,7 @@ code {
   height: 100%;
   /* width: 300px !important; */
   overflow: auto;
-  margin: 0 70px 0 40px;
+  margin: 0 70px 0 0px;
 }
 
 .activeremoteplayer {
@@ -295,6 +295,13 @@ code {
   font-size: 9px;
   min-width: 17px;
   min-height: 17px;
+}
+
+.focuslocal:hover .remotebtnsinfo {
+  visibility: visible;
+  opacity: 1;
+  z-index: 99;
+  transform: translate(0px, 0px);
 }
 
 .remoteplayer:hover .remotebtnsinfo {

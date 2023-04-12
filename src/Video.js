@@ -2,46 +2,29 @@ import React from "react";
 import { AgoraVideoPlayer } from "agora-rtc-react";
 import { Grid, Button } from "@material-ui/core";
 import { useState, useEffect } from "react";
-import { useClient, useMicrophoneAndCameraTracks } from "./settings.js";
 import MoreHorizOutlinedIcon from '@mui/icons-material/MoreHorizOutlined';
 import Menu from '@mui/material/Menu';
 import MenuItem from '@mui/material/MenuItem';
 import axios from "axios"
 
+const imgSrc = localStorage.getItem("imageURL");
+
+
 export default function Video(props) {
-  const client = useClient();
   const [gridSpacing, setGridSpacing] = useState(12);
   const [tracks, setTracks] = useState(props.tracks);
+  const [UID, setUID] = useState(null);
   const [anchorEl, setAnchorEl] = React.useState(null);
-  const [allUsers, setAllUsers] = useState([]);
   const [screeSize, setScreenSize] = useState(window.innerWidth);
   const open = Boolean(anchorEl);
   const handleClick = (event) => {
     setAnchorEl(event.currentTarget);
   };
 
+  console.log("child", props.trackState.video)
+
   const handleClose = () => {
     setAnchorEl(null);
-  }
-
-  const getUsersDetails = () => {
-    axios
-      .get(
-        `https://lingwa.app/wp-json/api/all-live-users?thread_id=${localStorage.getItem("thread_id")}`,
-        {
-          headers: {
-            "content-type": "application/json",
-          },
-        }
-      )
-      .then((res) => {
-        if (res.data.success) {
-          setAllUsers(res.data.data.users)
-        }
-      })
-      .catch((error) => {
-        console.error(error);
-      });
   }
 
   const handleRequest = (uid, type) => {
@@ -118,14 +101,6 @@ export default function Video(props) {
       });
   }
 
-  const mute = async (type, UID) => {
-    if (type === "muteAudio") {
-      client.muteRemoteAudioStream(UID, true);
-    } else if (type === "unmuteAudio") {
-      client.muteRemoteAudioStream(UID, false);
-    }
-  };
-
   useEffect(() => {
     window.onresize = function () {
       setScreenSize(window.innerWidth);
@@ -134,51 +109,35 @@ export default function Video(props) {
 
   useEffect(() => {
     setGridSpacing(Math.max(Math.floor(12 / (props.users?.length + 1)), screeSize < 450 ? props.users?.length < 3 ? 12 : 6 : props.users?.length < 4 ? 6 : props.users?.length < 6 ? 4 : 3));
-    getUsersDetails()
-  }, [props.users, tracks]);
+    setTracks(props.tracks)
+  }, [props.users, props.tracks]);
   return (
     <>
       {props.isPinned ?
-        <div className={`${props.activeSpeaker === parseInt(localStorage.getItem("user_id")) ? "activeremoteplayer" : ""}  focusview`}>
-          <div className={`${screeSize > 700 && screeSize < 800 ? "focuslocal2" : "focuslocal"}`} style={{ margin: `${props.openChat ? "0" : screeSize > 800 ? "0px 100px 0px 250px" : screeSize > 700 ? "0 70px 0 65px" : "0"}` }}>
-            {tracks[1]._enabled === true ?
-              <AgoraVideoPlayer
-                videoTrack={tracks[1]}
-                style={{ height: "100%", width: "100%", backgroundColor: '#ffffff', position: 'relative' }}
-              >
-                <span className="vc-username" >{localStorage.getItem("username")}</span>
-              </AgoraVideoPlayer>
-              :
-              <div className="local-focus-img">
-                <img src={localStorage.getItem("imageURL")} alt="user image" className={`${props.activeSpeaker === parseInt(localStorage.getItem("user_id")) ? "activeremoteplayer" : ""}  img-focus-local`} />
-                <span className="vc-username" >{localStorage.getItem("username")}</span>
-              </div>
-            }
-          </div>
-          <div className="focusremote" style={{ width: `${screeSize < 767 ? `${screeSize - 32}px` : '350px'}` }}>
-            {props.users?.length > 0 &&
+        <div className={`focusview`}>
+          <div className={`${screeSize > 700 && screeSize < 800 ? "focuslocal2" : "focuslocal"}`} style={{ margin: `${props.openChat ? "0" : screeSize > 800 ? "0px 70px 0px 250px" : screeSize > 700 ? "0 70px 0 65px" : "0"}` }}>
+            {props.users?.length > 0 ?
               props.users.map((user) => (
-                user.videoTrack !== undefined ?
-                  <div className={`${props.activeSpeaker === user.uid ? "activeremoteplayer" : ""} remoteplayer`}>
+                user.uid === props.activeSpeaker && props.activeSpeaker !== localStorage.getItem("user_id") ?
+                  user.videoTrack !== undefined ?
                     <AgoraVideoPlayer
                       videoTrack={user.videoTrack}
-                      key={user.uid}
-                      style={{ height: "100%", width: "100%", position: 'relative', borderRadius: '40px' }}
+                      style={{ height: "100%", width: "100%", backgroundColor: '#ffffff', position: 'relative' }}
                     >
                       <div className="remotebtnsinfo">
                         <button
                           className="remotebtns"
-                          id="demo-positioned-button"
-                          aria-controls={open ? 'demo-positioned-menu' : undefined}
+                          id={`demo-positioned-button-${user.uid}`}
+                          aria-controls={open ? `demo-positioned-menu-${user.uid}` : undefined}
                           aria-haspopup="true"
                           aria-expanded={open ? 'true' : undefined}
-                          onClick={handleClick}
+                          onClick={(e) => { handleClick(e); setUID(user.uid); }}
                         >
                           <MoreHorizOutlinedIcon />
                         </button>
                         <Menu
-                          id="demo-positioned-menu"
-                          aria-labelledby="demo-positioned-button"
+                          id={`demo-positioned-menu-${user.uid}`}
+                          aria-labelledby={`demo-positioned-button-${user.uid}`}
                           anchorEl={anchorEl}
                           open={open}
                           onClose={handleClose}
@@ -191,179 +150,43 @@ export default function Video(props) {
                             horizontal: 'left',
                           }}
                         >
-                          <MenuItem onClick={() => handleRequest(user.uid, "friend")}>Friend Request</MenuItem>
-                          <MenuItem onClick={() => handleRequest(user.uid, "profile")}>View Profile</MenuItem>
+                          <MenuItem onClick={() => handleRequest(UID, "friend")}>Friend Request</MenuItem>
+                          <MenuItem onClick={() => handleRequest(UID, "profile")}>View Profile</MenuItem>
                           <MenuItem
-                          // onClick={() => mute("muteAudio", user.uid)}
-                          >{user.hasAudio ? "Mute" : "Unmute"}</MenuItem>
-                          <MenuItem onClick={() => handleRequest(user.uid, "report")}>Report</MenuItem>
-                          {localStorage.getItem("isAdmin") === "yes" ?
-                            <MenuItem onClick={() => handlekick(user.uid)}>Remove from call</MenuItem>
+                            onClick={() => props.sendMessage(user.audioTrack !== undefined ? "muteAudio" : "unmuteAudio", UID)}
+                          >{user.audioTrack !== undefined ? "Mute" : "Unmute"}</MenuItem>
+                          <MenuItem onClick={() => handleRequest(UID, "report")}>Report</MenuItem>
+                          {localStorage.getItem("isAdmin") === 1 ?
+                            <MenuItem onClick={() => handlekick(UID)}>Remove from call</MenuItem>
                             : ""}
                         </Menu>
                       </div>
-                      {allUsers?.map((item) => (item.user_id === parseInt(user.uid) ?
+                      {props.allUsers?.map((item) => (item.user_id === parseInt(user.uid) ?
                         <span className="vc-username">
                           {item.name}
                         </span>
                         : ""
                       ))}
                     </AgoraVideoPlayer>
-                  </div>
-                  :
-                  <>
-                    <div className="remoteplayer">
-                      <div className="focus-remote-img">
-                        {allUsers?.map((item) => (item.user_id === parseInt(user.uid) ?
-                          <>
-                            <img className={`${props.activeSpeaker === user.uid ? "activeremoteplayer" : ""} img-remote-focus`} src={item.image} alt="user image" />
-                            <div className="remotebtnsinfo">
-                              <button
-                                className="remotebtns"
-                                id="demo-positioned-button"
-                                aria-controls={open ? 'demo-positioned-menu' : undefined}
-                                aria-haspopup="true"
-                                aria-expanded={open ? 'true' : undefined}
-                                onClick={handleClick}
-                              >
-                                <MoreHorizOutlinedIcon />
-                              </button>
-                              <Menu
-                                id="demo-positioned-menu"
-                                aria-labelledby="demo-positioned-button"
-                                anchorEl={anchorEl}
-                                open={open}
-                                onClose={handleClose}
-                                anchorOrigin={{
-                                  vertical: 'top',
-                                  horizontal: 'left',
-                                }}
-                                transformOrigin={{
-                                  vertical: 'top',
-                                  horizontal: 'left',
-                                }}
-                              >
-                                <MenuItem onClick={() => handleRequest(user.uid, "friend")}>Friend Request</MenuItem>
-                                <MenuItem onClick={() => handleRequest(user.uid, "profile")}>View Profile</MenuItem>
-                                <MenuItem
-                                // onClick={() => mute("muteAudio", user.uid)}
-                                >{user.hasAudio ? "Mute" : "Unmute"}</MenuItem>
-                                <MenuItem onClick={() => handleRequest(user.uid, "report")}>Report</MenuItem>
-                                {localStorage.getItem("isAdmin") === "yes" ?
-                                  <MenuItem onClick={() => handlekick(user.uid)}>Remove from call</MenuItem>
-                                  : ""}
-                              </Menu>
-                            </div>
-                            <span className="vc-username">
-                              {item.name}
-                            </span>
-                          </>
-                          : ""
-                        ))}
-                      </div>
-                    </div>
-                  </>
-              ))}
-          </div>
-        </div>
-        :
-        <Grid container style={{ height: "100%" }}>
-          <Grid item xs={gridSpacing}>
-            {tracks[1]._enabled !== true ?
-              <div className="gridlocal">
-                <div className="local-grid-img">
-                  <img src={localStorage.getItem("imageURL")} alt="user image" className={`${props.activeSpeaker === parseInt(localStorage.getItem("user_id")) ? "activeremoteplayer" : ""} img-grid-local`} />
-                  <span className="vc-username" >{localStorage.getItem("username")}</span>
-                </div>
-              </div>
-              :
-              <div className={`${props.activeSpeaker === parseInt(localStorage.getItem("user_id")) ? "activeremoteplayer" : ""} gridlocal`}>
-                <AgoraVideoPlayer
-                  videoTrack={tracks[1]}
-                  style={{ height: "100%", width: "100%", backgroundColor: '#ffffff', position: 'relative' }}
-                >
-                  <span className="vc-username" >{localStorage.getItem("username")}</span>
-                </AgoraVideoPlayer>
-              </div>
-            }
-          </Grid>
-          {props.users?.length > 0 &&
-            props.users.map((user) => (
-              user.videoTrack !== undefined ?
-                <Grid item xs={gridSpacing}>
-                  <div className={`${props.activeSpeaker === user.uid ? "activeremoteplayer" : ""} remoteplayer2`}>
-                    <AgoraVideoPlayer
-                      videoTrack={user.videoTrack}
-                      key={user.uid}
-                      style={{ height: "100%", width: "100%", position: 'relative' }}
-                    >
-                      <div className="remotebtnsinfo">
-                        <button
-                          className="remotebtns"
-                          id="demo-positioned-button"
-                          aria-controls={open ? 'demo-positioned-menu' : undefined}
-                          aria-haspopup="true"
-                          aria-expanded={open ? 'true' : undefined}
-                          onClick={handleClick}
-                        >
-                          <MoreHorizOutlinedIcon />
-                        </button>
-                        <Menu
-                          id="demo-positioned-menu"
-                          aria-labelledby="demo-positioned-button"
-                          anchorEl={anchorEl}
-                          open={open}
-                          onClose={handleClose}
-                          anchorOrigin={{
-                            vertical: 'top',
-                            horizontal: 'left',
-                          }}
-                          transformOrigin={{
-                            vertical: 'top',
-                            horizontal: 'left',
-                          }}
-                        >
-                          <MenuItem onClick={() => handleRequest(user.uid, "friend")}>Friend Request</MenuItem>
-                          <MenuItem onClick={() => handleRequest(user.uid, "profile")}>View Profile</MenuItem>
-                          <MenuItem
-                          // onClick={() => mute("muteAudio", user.uid)}
-                          >{user.hasAudio ? "Mute" : "Unmute"}</MenuItem>
-                          <MenuItem onClick={() => handleRequest(user.uid, "report")}>Report</MenuItem>
-                          {localStorage.getItem("isAdmin") === "yes" ?
-                            <MenuItem onClick={() => handlekick(user.uid)}>Remove from call</MenuItem>
-                            : ""}
-                        </Menu>
-                      </div>
-                      {allUsers?.map((item) => (item.user_id === parseInt(user.uid) ?
-                        <span className="vc-username">
-                          {item.name}
-                        </span>
-                        : ""
-                      ))}
-                    </AgoraVideoPlayer>
-                  </div>
-                </Grid>
-                :
-                <Grid item xs={gridSpacing}>
-                  <div className="remoteplayer2">
-                    <div className="grid-remote-img">
-                      {allUsers?.map((item) => (item.user_id === parseInt(user.uid) ?
+                    :
+                    <div className="local-focus-img">
+                      {props.allUsers?.map((item) => (item.user_id === parseInt(user.uid) ?
                         <>
-                          <img className={`${props.activeSpeaker === user.uid ? "activeremoteplayer" : ""} img-remote-grid`} src={item.image} alt="user image" />
+                          <img className={`${props.activeSpeaker2 === user.uid ? "activeremoteplayer" : ""} img-focus-local`} src={item.image} alt="user image" />
                           <div className="remotebtnsinfo">
                             <button
                               className="remotebtns"
-                              id="demo-positioned-button"
-                              aria-controls={open ? 'demo-positioned-menu' : undefined}
+                              id={`demo-positioned-button-${user.uid}`}
+                              aria-controls={open ? `demo-positioned-menu-${user.uid}` : undefined}
                               aria-haspopup="true"
                               aria-expanded={open ? 'true' : undefined}
-                              onClick={handleClick}
+                              onClick={(e) => { handleClick(e); setUID(user.uid); }}
                             >
                               <MoreHorizOutlinedIcon />
                             </button>
                             <Menu
-                              id="demo-positioned-menu"
-                              aria-labelledby="demo-positioned-button"
+                              id={`demo-positioned-menu-${user.uid}`}
+                              aria-labelledby={`demo-positioned-button-${user.uid}`}
                               anchorEl={anchorEl}
                               open={open}
                               onClose={handleClose}
@@ -376,14 +199,346 @@ export default function Video(props) {
                                 horizontal: 'left',
                               }}
                             >
-                              <MenuItem onClick={() => handleRequest(user.uid, "friend")}>Friend Request</MenuItem>
-                              <MenuItem onClick={() => handleRequest(user.uid, "profile")}>View Profile</MenuItem>
+                              <MenuItem onClick={() => handleRequest(UID, "friend")}>Friend Request</MenuItem>
+                              <MenuItem onClick={() => handleRequest(UID, "profile")}>View Profile</MenuItem>
                               <MenuItem
-                              // onClick={() => mute("muteAudio", user.uid)}
-                              >{user.hasAudio ? "Mute" : "Unmute"}</MenuItem>
-                              <MenuItem onClick={() => handleRequest(user.uid, "report")}>Report</MenuItem>
-                              {localStorage.getItem("isAdmin") === "yes" ?
-                                <MenuItem onClick={() => handlekick(user.uid)}>Remove from call</MenuItem>
+                                onClick={() => props.sendMessage(user.audioTrack !== undefined ? "muteAudio" : "unmuteAudio", UID)}
+                              >{user.audioTrack !== undefined ? "Mute" : "Unmute"}</MenuItem>
+                              <MenuItem onClick={() => handleRequest(UID, "report")}>Report</MenuItem>
+                              {localStorage.getItem("isAdmin") === 1 ?
+                                <MenuItem onClick={() => handlekick(UID)}>Remove from call</MenuItem>
+                                : ""}
+                            </Menu>
+                          </div>
+                          <span className="vc-username">
+                            {item.name}
+                          </span>
+                        </>
+                        : ""
+                      ))}
+                    </div>
+                  :
+                  ""
+                // <>
+                //   {props.users[0]?.videoTrack === undefined ?
+                //     <div className="local-focus-img">
+                //       {props.allUsers?.map((item) => (item.user_id === parseInt(props.users[0].uid) ?
+                //         <>
+                //           <img className={`${props.activeSpeaker2 === props.users[0].uid ? "activeremoteplayer" : ""} img-focus-local`} src={item.image} alt="user image" />
+                //           <div className="remotebtnsinfo">
+                //             <button
+                //               className="remotebtns"
+                //               id={`demo-positioned-button-${props.users[0].uid}`}
+                //               aria-controls={open ? `demo-positioned-menu-${props.users[0].uid}` : undefined}
+                //               aria-haspopup="true"
+                //               aria-expanded={open ? 'true' : undefined}
+                //               onClick={(e) => {handleClick(e); setUID(props.users[0].uid);}}
+                //             >
+                //               <MoreHorizOutlinedIcon />
+                //             </button>
+                //             <Menu
+                //               id={`demo-positioned-menu-${props.users[0].uid}`}
+                //               aria-labelledby={`demo-positioned-button-${props.users[0].uid}`}
+                //               anchorEl={anchorEl}
+                //               open={open}
+                //               onClose={handleClose}
+                //               anchorOrigin={{
+                //                 vertical: 'top',
+                //                 horizontal: 'left',
+                //               }}
+                //               transformOrigin={{
+                //                 vertical: 'top',
+                //                 horizontal: 'left',
+                //               }}
+                //             >
+                //               <MenuItem onClick={() => handleRequest(UID, "friend")}>Friend Request</MenuItem>
+                //               <MenuItem onClick={() => handleRequest(UID, "profile")}>View Profile</MenuItem>
+                //               <MenuItem
+                //                 onClick={() => props.sendMessage("muteAudio", UID)}
+                //               >{props.users[0].hasAudio ? "Mute" : "Unmute"}</MenuItem>
+                //               <MenuItem onClick={() => handleRequest(UID, "report")}>Report</MenuItem>
+                //               {localStorage.getItem("isAdmin") === 1 ?
+                //                 <MenuItem onClick={() => handlekick(UID)}>Remove from call</MenuItem>
+                //                 : ""}
+                //             </Menu>
+                //           </div>
+                //           <span className="vc-username">
+                //             {item.name}
+                //           </span>
+                //         </>
+                //         : ""
+                //       ))}
+                //     </div>
+                //     :
+                //     <AgoraVideoPlayer
+                //       videoTrack={props.users[0]?.videoTrack}
+                //       style={{ height: "100%", width: "100%", backgroundColor: '#ffffff', position: 'relative' }}
+                //     >
+                //       <div className="remotebtnsinfo">
+                //         <button
+                //           className="remotebtns"
+                //           id={`demo-positioned-button-${props.users[0].uid}`}
+                //           aria-controls={open ? `demo-positioned-menu-${props.users[0].uid}` : undefined}
+                //           aria-haspopup="true"
+                //           aria-expanded={open ? 'true' : undefined}
+                //           onClick={(e) => {handleClick(e); setUID(props.users[0].uid);}}
+                //         >
+                //           <MoreHorizOutlinedIcon />
+                //         </button>
+                //         <Menu
+                //           id={`demo-positioned-menu-${props.users[0].uid}`}
+                //           aria-labelledby={`demo-positioned-button-${props.users[0].uid}`}
+                //           anchorEl={anchorEl}
+                //           open={open}
+                //           onClose={handleClose}
+                //           anchorOrigin={{
+                //             vertical: 'top',
+                //             horizontal: 'left',
+                //           }}
+                //           transformOrigin={{
+                //             vertical: 'top',
+                //             horizontal: 'left',
+                //           }}
+                //         >
+                //           <MenuItem onClick={() => handleRequest(UID, "friend")}>Friend Request</MenuItem>
+                //           <MenuItem onClick={() => handleRequest(UID, "profile")}>View Profile</MenuItem>
+                //           <MenuItem
+                //             onClick={() => props.sendMessage("muteAudio", UID)}
+                //           >{props.users[0].hasAudio ? "Mute" : "Unmute"}</MenuItem>
+                //           <MenuItem onClick={() => handleRequest(UID, "report")}>Report</MenuItem>
+                //           {localStorage.getItem("isAdmin") === 1 ?
+                //             <MenuItem onClick={() => handlekick(UID)}>Remove from call</MenuItem>
+                //             : ""}
+                //         </Menu>
+                //       </div>
+                //       {props.allUsers?.map((item) => (item.user_id === parseInt(props.users[0].uid) ?
+                //         <span className="vc-username">
+                //           {item.name}
+                //         </span>
+                //         : ""
+                //       ))}
+                //     </AgoraVideoPlayer>
+                //   }
+                // </>
+              ))
+              :
+              <>
+                {props.trackState.video === true ?
+                  <AgoraVideoPlayer
+                    videoTrack={tracks[1]}
+                    style={{ height: "100%", width: "100%", backgroundColor: '#ffffff', position: 'relative' }}
+                  >
+                    <span className="vc-username" >{localStorage.getItem("username")}</span>
+                  </AgoraVideoPlayer>
+                  :
+                  <div className="local-focus-img">
+                    <img src={imgSrc} alt="user image" className={`img-focus-local`} />
+                    <span className="vc-username" >{localStorage.getItem("username")}</span>
+                  </div>
+                }
+              </>
+            }
+          </div>
+          <div className="focusremote" style={{ width: `${screeSize < 767 ? `${screeSize - 32}px` : props.openChat ? '220px' : '350px'}` }}>
+            {props.users?.length > 0 ?
+              <>
+                {props.trackState.video === true ?
+                  <div className={`remoteplayer`}>
+                    <AgoraVideoPlayer
+                      videoTrack={tracks[1]}
+                      style={{ height: "100%", width: "100%", backgroundColor: '#ffffff', position: 'relative' }}
+                    >
+                      <span className="vc-username" >{localStorage.getItem("username")}</span>
+                    </AgoraVideoPlayer>
+                  </div>
+                  :
+                  <div className="remoteplayer">
+                    <div className="focus-remote-img">
+                      <img src={imgSrc} alt="user image" className={`img-remote-focus`} />
+                      <span className="vc-username" >{localStorage.getItem("username")}</span>
+                    </div>
+                  </div>
+                }
+              </>
+              : ""
+            }
+            {props.users?.length > 1 &&
+              props.users.map((user) => (
+                user.uid !== props.activeSpeaker ?
+                  user.videoTrack === undefined ?
+                    <>
+                      <div className="remoteplayer">
+                        <div className="focus-remote-img">
+                          {props.allUsers?.map((item) => (item.user_id === parseInt(user.uid) ?
+                            <>
+                              <img className={`${props.activeSpeaker2 === user.uid ? "activeremoteplayer" : ""} img-remote-focus`} src={item.image} alt="user image" />
+                              <div className="remotebtnsinfo">
+                                <button
+                                  className="remotebtns"
+                                  id={`demo-positioned-button-${user.uid}`}
+                                  aria-controls={open ? `demo-positioned-menu-${user.uid}` : undefined}
+                                  aria-haspopup="true"
+                                  aria-expanded={open ? 'true' : undefined}
+                                  onClick={(e) => { handleClick(e); setUID(user.uid); }}
+                                >
+                                  <MoreHorizOutlinedIcon />
+                                </button>
+                                <Menu
+                                  id={`demo-positioned-menu-${user.uid}`}
+                                  aria-labelledby={`demo-positioned-button-${user.uid}`}
+                                  anchorEl={anchorEl}
+                                  open={open}
+                                  onClose={handleClose}
+                                  anchorOrigin={{
+                                    vertical: 'top',
+                                    horizontal: 'left',
+                                  }}
+                                  transformOrigin={{
+                                    vertical: 'top',
+                                    horizontal: 'left',
+                                  }}
+                                >
+                                  <MenuItem onClick={() => handleRequest(UID, "friend")}>Friend Request</MenuItem>
+                                  <MenuItem onClick={() => handleRequest(UID, "profile")}>View Profile</MenuItem>
+                                  <MenuItem
+                                    onClick={() => props.sendMessage(user.audioTrack !== undefined ? "muteAudio" : "unmuteAudio", UID)}
+                                  >{user.audioTrack !== undefined ? "Mute" : "Unmute"}</MenuItem>
+                                  <MenuItem onClick={() => handleRequest(UID, "report")}>Report</MenuItem>
+                                  {localStorage.getItem("isAdmin") === 1 ?
+                                    <MenuItem onClick={() => handlekick(UID)}>Remove from call</MenuItem>
+                                    : ""}
+                                </Menu>
+                              </div>
+                              <span className="vc-username">
+                                {item.name}
+                              </span>
+                            </>
+                            : ""
+                          ))}
+                        </div>
+                      </div>
+                    </>
+                    :
+                    <div className={`remoteplayer`}>
+                      <AgoraVideoPlayer
+                        videoTrack={user.videoTrack}
+                        key={user.uid}
+                        style={{ height: "100%", width: "100%", position: 'relative', borderRadius: '40px' }}
+                      >
+                        <div className="remotebtnsinfo">
+                          <button
+                            className="remotebtns"
+                            id={`demo-positioned-button-${user.uid}`}
+                            aria-controls={open ? `demo-positioned-menu-${user.uid}` : undefined}
+                            aria-haspopup="true"
+                            aria-expanded={open ? 'true' : undefined}
+                            onClick={(e) => { handleClick(e); setUID(user.uid); }}
+                          >
+                            <MoreHorizOutlinedIcon />
+                          </button>
+                          <Menu
+                            id={`demo-positioned-menu-${user.uid}`}
+                            aria-labelledby={`demo-positioned-button-${user.uid}`}
+                            anchorEl={anchorEl}
+                            open={open}
+                            onClose={handleClose}
+                            anchorOrigin={{
+                              vertical: 'top',
+                              horizontal: 'left',
+                            }}
+                            transformOrigin={{
+                              vertical: 'top',
+                              horizontal: 'left',
+                            }}
+                          >
+                            <MenuItem onClick={() => handleRequest(UID, "friend")}>Friend Request</MenuItem>
+                            <MenuItem onClick={() => handleRequest(UID, "profile")}>View Profile</MenuItem>
+                            <MenuItem
+                              onClick={() => props.sendMessage(user.audioTrack !== undefined ? "muteAudio" : "unmuteAudio", UID)}
+                            >{user.audioTrack !== undefined ? "Mute" : "Unmute"}</MenuItem>
+                            <MenuItem onClick={() => handleRequest(UID, "report")}>Report</MenuItem>
+                            {localStorage.getItem("isAdmin") === 1 ?
+                              <MenuItem onClick={() => handlekick(UID)}>Remove from call</MenuItem>
+                              : ""}
+                          </Menu>
+                        </div>
+                        {props.allUsers?.map((item) => (item.user_id === parseInt(user.uid) ?
+                          <span className="vc-username">
+                            {item.name}
+                          </span>
+                          : ""
+                        ))}
+                      </AgoraVideoPlayer>
+                    </div>
+                  :
+                  ""
+              ))}
+          </div>
+        </div>
+        :
+        <Grid container style={{ height: "100%" }}>
+          <Grid item xs={gridSpacing}>
+            {props.trackState.video !== true ?
+              <div className="gridlocal">
+                <div className="local-grid-img">
+                  <img src={imgSrc} alt="user image" className={`${props.activeSpeaker === parseInt(localStorage.getItem("user_id")) ? "activeremoteplayer" : ""} img-grid-local`} />
+                  <span className="vc-username" >{localStorage.getItem("username")}</span>
+                </div>
+              </div>
+              :
+              <div className={`${props.activeSpeaker2 === parseInt(localStorage.getItem("user_id")) ? "activeremoteplayer" : ""} gridlocal`}>
+                <AgoraVideoPlayer
+                  videoTrack={tracks[1]}
+                  style={{ height: "100%", width: "100%", backgroundColor: '#ffffff', position: 'relative' }}
+                >
+                  <span className="vc-username" >{localStorage.getItem("username")}</span>
+                </AgoraVideoPlayer>
+              </div>
+            }
+          </Grid>
+          {props.users?.length > 0 &&
+            props.users.map((user) => (
+              user.videoTrack === undefined ?
+                <Grid item xs={gridSpacing}>
+                  <div className="remoteplayer2">
+                    <div className="grid-remote-img">
+                      {props.allUsers?.map((item) => (item.user_id === parseInt(user.uid) ?
+                        <>
+                          <img className={`${props.activeSpeaker2 === user.uid ? "activeremoteplayer" : ""} img-remote-grid`} src={item.image} alt="user image" />
+                          <div className="remotebtnsinfo">
+                            <button
+                              className="remotebtns"
+                              id={`demo-positioned-button-${user.uid}`}
+                              aria-controls={open ? `demo-positioned-menu-${user.uid}` : undefined}
+                              aria-haspopup="true"
+                              aria-expanded={open ? 'true' : undefined}
+                              onClick={(e) => { handleClick(e); setUID(user.uid); }}
+                            >
+                              <MoreHorizOutlinedIcon />
+                            </button>
+                            <Menu
+                              id={`demo-positioned-menu-${user.uid}`}
+                              aria-labelledby={`demo-positioned-button-${user.uid}`}
+                              anchorEl={anchorEl}
+                              open={open}
+                              onClose={handleClose}
+                              anchorOrigin={{
+                                vertical: 'top',
+                                horizontal: 'left',
+                              }}
+                              transformOrigin={{
+                                vertical: 'top',
+                                horizontal: 'left',
+                              }}
+                            >
+                              <MenuItem onClick={() => handleRequest(item.user_id, "friend")}>Friend Request</MenuItem>
+                              <MenuItem onClick={() => handleRequest(item.user_id, "profile")}>View Profile</MenuItem>
+                              <MenuItem
+                                onClick={() => props.sendMessage(user.audioTrack !== undefined ? "muteAudio" : "unmuteAudio", item.user_id)}
+                              >{user.audioTrack !== undefined ? "Mute" : "Unmute"}</MenuItem>
+                              <MenuItem onClick={() => handleRequest(item.user_id, "report")}>Report</MenuItem>
+                              {localStorage.getItem("isAdmin") === 1 ?
+                                <MenuItem onClick={() => handlekick(item.user_id)}>Remove from call</MenuItem>
                                 : ""}
                             </Menu>
                           </div>
@@ -395,6 +550,60 @@ export default function Video(props) {
                         ""
                       ))}
                     </div>
+                  </div>
+                </Grid>
+                :
+                <Grid item xs={gridSpacing}>
+                  <div className={`${props.activeSpeaker2 === user.uid ? "activeremoteplayer" : ""} remoteplayer2`}>
+                    <AgoraVideoPlayer
+                      videoTrack={user.videoTrack}
+                      key={user.uid}
+                      style={{ height: "100%", width: "100%", position: 'relative' }}
+                    >
+                      <div className="remotebtnsinfo">
+                        <button
+                          className="remotebtns"
+                          id={`demo-positioned-button-${user.uid}`}
+                          aria-controls={open ? `demo-positioned-menu-${user.uid}` : undefined}
+                          aria-haspopup="true"
+                          aria-expanded={open ? 'true' : undefined}
+                          onClick={(e) => { handleClick(e); setUID(user.uid); }}
+                        >
+                          <MoreHorizOutlinedIcon />
+                        </button>
+                        <Menu
+                          id={`demo-positioned-menu-${user.uid}`}
+                          aria-labelledby={`demo-positioned-button-${user.uid}`}
+                          anchorEl={anchorEl}
+                          open={open}
+                          onClose={handleClose}
+                          anchorOrigin={{
+                            vertical: 'top',
+                            horizontal: 'left',
+                          }}
+                          transformOrigin={{
+                            vertical: 'top',
+                            horizontal: 'left',
+                          }}
+                        >
+                          <MenuItem onClick={() => handleRequest(UID, "friend")}>Friend Request</MenuItem>
+                          <MenuItem onClick={() => handleRequest(UID, "profile")}>View Profile</MenuItem>
+                          <MenuItem
+                            onClick={() => props.sendMessage(user.audioTrack !== undefined ? "muteAudio" : "unmuteAudio", UID)}
+                          >{user.audioTrack !== undefined ? "Mute" : "Unmute"}</MenuItem>
+                          <MenuItem onClick={() => handleRequest(UID, "report")}>Report</MenuItem>
+                          {localStorage.getItem("isAdmin") === 1 ?
+                            <MenuItem onClick={() => handlekick(UID)}>Remove from call</MenuItem>
+                            : ""}
+                        </Menu>
+                      </div>
+                      {props.allUsers?.map((item) => (item.user_id === parseInt(user.uid) ?
+                        <span className="vc-username">
+                          {item.name} {user.uid}
+                        </span>
+                        : ""
+                      ))}
+                    </AgoraVideoPlayer>
                   </div>
                 </Grid>
             ))}

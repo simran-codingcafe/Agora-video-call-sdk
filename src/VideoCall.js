@@ -1,10 +1,14 @@
 import { useState, useEffect } from "react";
 import {
   config,
-  useClient,
+  useRTCClient,
   useMicrophoneAndCameraTracks,
   channelName,
 } from "./settings.js";
+import {
+  useRtmClient,
+  useRtmChannel,
+} from "./rtmsettings.js";
 import { Grid } from "@material-ui/core";
 import Video from "./Video";
 import Controls from "./Controls";
@@ -17,13 +21,15 @@ import VideocamOffIconOutlined from "@material-ui/icons/VideocamOffOutlined";
 import PhoneDisabledIcon from '@mui/icons-material/PhoneDisabled';
 import ChatIcon from '@mui/icons-material/ChatBubbleOutlineOutlined';
 import AutoAwesomeMosaicIcon from '@mui/icons-material/AutoAwesomeMosaicOutlined';
+import CircularProgress from '@mui/material/CircularProgress';
+import Box from '@mui/material/Box';
 import io from "socket.io-client"
-
 
 export default function VideoCall(props) {
   const { setInCall } = props;
   const [users, setUsers] = useState([]);
   const [activeSpeaker, setActiveSpeaker] = useState("");
+  const [activeSpeaker2, setActiveSpeaker2] = useState("");
   const [error, setError] = useState(false);
   const [start, setStart] = useState(false);
   const [isPinned, setPinned] = useState(false)
@@ -31,28 +37,14 @@ export default function VideoCall(props) {
   const [unread, setUnread] = useState(false)
   const [username, setUsername] = useState(localStorage.getItem("username"))
   const [callHeading, setCallHeading] = useState(localStorage.getItem("callHeading"))
-  const [leaveURL, setLeaveURL] = useState(localStorage.getItem("leaveURL"))
-  const client = useClient();
+  const client = useRTCClient();
   const { ready, tracks } = useMicrophoneAndCameraTracks();
   const [screenSize, setScreenSize] = useState(window.innerWidth);
   const [trackState, setTrackState] = useState({ video: true, audio: true });
+  const [allUsers, setAllUsers] = useState([]);
+  const rtmClient = useRtmClient();
+  const rtmChannel = useRtmChannel(rtmClient)
 
-  // useEffect(() => {
-  //   const url = new URL(window.location.href);
-  //   const params = new URLSearchParams(url.search);
-  //   const calltype = params.get('join-with');
-
-  //   setTimeout(() => {
-  //     if (calltype === "audio") {
-  //       setTimeout(() => {
-  //         tracks[1].setEnabled(!trackState.video);
-  //         setTrackState((ps) => {
-  //           return { ...ps, video: !ps.video };
-  //         });
-  //       }, 1000);
-  //     }
-  //   }, 1000);
-  // }, [])
 
   const mute = async (type) => {
     if (type === "audio") {
@@ -75,6 +67,10 @@ export default function VideoCall(props) {
     tracks[1].close();
     setStart(false);
     setInCall(false);
+    await rtmChannel.leave()
+    await rtmClient.logout()
+    rtmChannel.removeAllListeners()
+    rtmClient.removeAllListeners()
     axios
       .get(
         `https://lingwa.app/wp-json/api/leave-call?thread_id=${localStorage.getItem("thread_id")}&user_id=${localStorage.getItem("user_id")}`,
@@ -94,15 +90,35 @@ export default function VideoCall(props) {
       });
   };
 
-  useEffect(() => { 
-    const socket = io("http://phpstack-932189-3368876.cloudwaysapps.com/")
-    socket.on(`${localStorage.getItem("thread_id")}`,(type, data) => {
-     if (type === "message") {
-         setUnread(true)
-       } 
+  useEffect(() => {
+    const socket = io("https://phpstack-932189-3368876.cloudwaysapps.com/")
+    socket.on(`${localStorage.getItem("thread_id")}`, (type, data) => {
+      if (type === "message") {
+        setUnread(true)
+      }
     })
     return () => socket.disconnect()
-}, [])
+  }, [])
+
+  const getUsersDetails = () => {
+    axios
+      .get(
+        `https://lingwa.app/wp-json/api/all-live-users?thread_id=${localStorage.getItem("thread_id")}`,
+        {
+          headers: {
+            "content-type": "application/json",
+          },
+        }
+      )
+      .then((res) => {
+        if (res.data.success) {
+          setAllUsers(res.data.data.users)
+        }
+      })
+      .catch((error) => {
+        console.error(error);
+      });
+  }
 
   useEffect(() => {
     window.onresize = function () {
@@ -111,13 +127,18 @@ export default function VideoCall(props) {
   }, [])
 
   useEffect(() => {
+    getUsersDetails()
+  }, [users])
+
+  useEffect(() => {
     function handleVolumeIndicator(volumes) {
       volumes.forEach((volume) => {
-        if (config.uid !== volume.uid && volume.level > 2) {
+        if (config.uid !== volume.uid && volume.level > 25) {
           const activeSpeakerId = volume.uid
-          setActiveSpeaker(activeSpeakerId)
+            setActiveSpeaker(activeSpeakerId)
+            setActiveSpeaker2(activeSpeakerId)
         } else {
-          setActiveSpeaker("")
+          setActiveSpeaker2("")
         }
       });
     }
@@ -128,7 +149,7 @@ export default function VideoCall(props) {
     return () => {
       client.off('volume-indicator', handleVolumeIndicator);
     };
-  }, [client, config.uid]);
+  }, [client]);
 
   useEffect(() => {
     let init = async (name) => {
@@ -145,8 +166,7 @@ export default function VideoCall(props) {
               return [...prevUsers, user];
             }
           });
-        }
-        if (mediaType === "audio") {
+        } else if (mediaType === "audio") {
           user.audioTrack.play();
           setUsers((prevUsers) => {
             const index = prevUsers.findIndex((item) => item.uid === user.uid);
@@ -166,9 +186,16 @@ export default function VideoCall(props) {
           if (user.audioTrack) user.audioTrack.stop();
         }
         if (mediaType === "video") {
-          // setUsers((prevUsers) => {
-          //   return prevUsers.filter((User) => User.uid !== user.uid);
-          // });
+          setUsers((prevUsers) => {
+            const index = prevUsers.findIndex((item) => item.uid === user.uid);
+            if (index !== -1) {
+              const updatedUsers = [...prevUsers];
+              updatedUsers[index] = user;
+              return updatedUsers;
+            } else {
+              return [...prevUsers, user];
+            }
+          });
         }
       });
 
@@ -180,65 +207,87 @@ export default function VideoCall(props) {
       });
 
       try {
-        await client.join(config.appId, name, config.token, config.uid);
-        if (tracks) await client.publish([tracks[0], tracks[1]]);
-        setStart(true);
-        const url = new URL(window.location.href);
-        const params = new URLSearchParams(url.search);
-        const calltype = params.get('join-with');
-        setTimeout(() => {
-          if (calltype === "audio") {
-            tracks[1].setEnabled(!trackState.video);
-            setTrackState((ps) => {
-              return { ...ps, video: !ps.video };
-            });
+        if (config.appId) {
+          await client.join(config.appId, name, config.token, config.uid);
+          setStart(true);
+          const url = new URL(window.location.href);
+          const params = new URLSearchParams(url.search);
+          const calltype = params.get('join-with');
+          if (tracks) {
+            if (calltype === "audio") {
+              tracks[1].setEnabled(false);
+              setTrackState((ps) => {
+                return { ...ps, video: !ps.video };
+              });
+            }
+            await client.publish([tracks[0], tracks[1]]);
           }
-        }, 1000);
-        setError(false)
+          setError(false)
+        } else {
+          // window.location.reload()
+        }
       } catch (error) {
+        window.location.reload()
         console.log("error", error);
         setError(true)
-        // init(channelName);
       }
+    };
+
+    let initRTM = async () => {
+      const UID = localStorage.getItem("user_id") !== null ? localStorage.getItem("user_id").toString() : Math.floor(Math.random() * 16).toString()
+      await rtmClient.login({ uid: UID, token: localStorage.getItem("rtm_token") })
+      await rtmChannel.join()
+      client.on('ConnectionStateChanged', async (state, reason) => {
+        console.log('ConnectionStateChanged', state, reason)
+      })
+      rtmClient.on('MessageFromPeer', function (message, peerId) {
+        if (message.text === "muteAudio") {
+          tracks[0].setEnabled(false);
+          setTrackState((ps) => {
+            return { ...ps, audio: !ps.audio };
+          });
+        } else if (message.text === "unmuteAudio") {
+          tracks[0].setEnabled(true);
+          setTrackState((ps) => {
+            return { ...ps, audio: !ps.audio };
+          });
+        }
+      })
+      rtmChannel.on('MemberJoined', (memberId) => {
+        console.log('New Member: ', memberId)
+      })
     };
 
     if (ready && tracks) {
       try {
         init(channelName);
+        initRTM()
       } catch (error) {
         console.log(error);
+        setError(true)
       }
     }
-  }, [channelName, client, ready, tracks]);
+  }, [channelName, client, ready, tracks, error]);
+
+  const sendMessage = async (text, UID) => {
+    let peerId = UID.toString()
+    try {
+      await rtmClient.sendMessageToPeer({ text: text }, peerId).then(sendResult => {
+        if (sendResult.hasPeerReceived) {
+          console.log("message sent sucessfully", sendResult)
+        } else {
+          console.log("message failed", sendResult)
+        }
+      }).catch(error => {
+        console.log("error", error)
+      });
+    } catch (error) {
+      console.error(error);
+    }
+  }
 
   const cancelChat = () => {
     setOpenChat(false)
-  }
-
-  const endCall = async () => {
-    await client.leave();
-    client.removeAllListeners();
-    tracks[0].close();
-    tracks[1].close();
-    setStart(false);
-    setInCall(false);
-    axios
-      .get(
-        `https://lingwa.app/wp-json/api/leave-call?thread_id=${localStorage.getItem("thread_id")}&user_id=${localStorage.getItem("user_id")}`,
-        {
-          headers: {
-            "content-type": "application/json",
-          },
-        }
-      )
-      .then((res) => {
-        if (res.data.success) {
-          window.location.href = leaveURL
-        }
-      })
-      .catch((error) => {
-        console.error(error);
-      });
   }
 
   return (
@@ -249,7 +298,7 @@ export default function VideoCall(props) {
             <div className="headTab">
               <span
                 className="btnBack"
-                onClick={() => endCall()}
+                onClick={() => leaveChannel()}
               >
                 &#60;
               </span>
@@ -258,13 +307,18 @@ export default function VideoCall(props) {
           </div>
         </Grid>
         {error ?
-          <span style={{ marginTop: '50px', textAlign: 'center' }}>
-            You are not connected please refresh.
-          </span>
+          <Box sx={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            height: "100vh",
+          }}>
+            <CircularProgress />
+          </Box>
           :
           <>
             <Grid item style={{ height: `${screenSize < 700 ? "90%" : "81%"}` }}>
-              {start && tracks && <Video tracks={tracks} users={users} isPinned={isPinned} activeSpeaker={activeSpeaker} openChat={openChat} />}
+              {start && tracks && <Video tracks={tracks} users={users} isPinned={isPinned} activeSpeaker={activeSpeaker} activeSpeaker2={activeSpeaker2} openChat={openChat} allUsers={allUsers} sendMessage={sendMessage} trackState={trackState} />}
             </Grid>
             <Grid item style={{ height: "10%" }}>
               {ready && tracks && (
@@ -280,7 +334,7 @@ export default function VideoCall(props) {
                     <PhoneDisabledIcon />
                   </button>
                   <button className="vc-localbtns" style={{ color: openChat ? "blue" : "" }} onClick={() => setOpenChat(!openChat)}>
-                  {unread ? <span className="unread-chat"></span> : ""}
+                    {unread ? <span className="unread-chat"></span> : ""}
                     <ChatIcon />
                   </button>
                   <button className="vc-localbtns" onClick={() => setPinned(!isPinned)}>
