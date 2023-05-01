@@ -3,7 +3,10 @@ import CircularProgress from '@mui/material/CircularProgress';
 import Box from '@mui/material/Box';
 import VideoCall from "./VideoCall";
 import axios from "axios"
+import { createChannel, createClient as createRTMClient } from 'agora-rtm-react'
+import { createClient as createRTCClient, createMicrophoneAndCameraTracks } from 'agora-rtc-react';
 
+let useRtmClient, useRtmChannel, config,  useRTCClient, useMicrophoneAndCameraTracks, channelName;
 
 function App() {
   const [inCall, setInCall] = useState(false);
@@ -34,6 +37,20 @@ function App() {
         localStorage.setItem("imageURL", res.data.user.image)
         localStorage.setItem("username", res.data.user.name)
         localStorage.setItem("user_id", res.data.user.id)
+        channelName = res.data.channel_name
+        config = { mode: "rtc", codec: "vp8", appId: res.data.app_id, token: res.data.token, uid: res.data.user.id }
+        if (res.data.app_id) {
+          useRTCClient = createRTCClient(config);
+          useMicrophoneAndCameraTracks = createMicrophoneAndCameraTracks();
+        } else {
+          console.error("App ID not found");
+        }
+        if (res.data.rtm_app_id) {
+          useRtmClient = createRTMClient(res.data.rtm_app_id);
+          useRtmChannel = createChannel(res.data.channel_name);
+        } else {
+          console.error("App ID not found");
+        }
         setTimeout(() => {
           setInCall(true)
         }, 500);
@@ -87,4 +104,5 @@ function App() {
   );
 }
 
+export { useRtmClient, useRtmChannel, config,  useRTCClient, useMicrophoneAndCameraTracks, channelName };
 export default App;

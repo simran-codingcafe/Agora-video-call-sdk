@@ -15,7 +15,7 @@ code {
   height: 100vh;
 }
 
-.vc-container {
+.vc-container-unique {
   max-width: 1100px;
   margin: 25px auto;
   height: 90vh;
@@ -122,7 +122,7 @@ code {
   height: 100%;
   width: calc(100% - 300px);
   overflow: hidden;
-  border-radius: 35px;
+  border-radius: 15px;
   position: relative;
 }
 
@@ -130,7 +130,7 @@ code {
   height: 100%;
   width: calc(100% - 125px);
   overflow: hidden;
-  border-radius: 35px;
+  border-radius: 15px;
   position: relative;
 }
 
@@ -152,7 +152,7 @@ code {
   margin-bottom: 10px;
   overflow: hidden;
   position: relative;
-  border-radius: 35px;
+  border-radius: 30px;
 }
 
 .remoteplayer2 {
